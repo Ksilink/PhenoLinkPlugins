@@ -12,6 +12,22 @@
 #include <functional>
 #include <QColor>
 
+/**
+ * @brief analyseDomElement function analyzes a QDomElement and extracts information from its attributes.
+ * It processes the attributes related to row, column, timepoint, field index, z index, channel, type, and action.
+ * It also checks for errors in the XML file and adds them to the error string.
+ * If the row and column values are valid, it updates the ExperimentFileModel with the extracted information.
+ * It also checks if the element contains an image file and adds it to the ExperimentFileModel if it does.
+ * Finally, it checks the validity of the ExperimentFileModel.
+ *
+ * @param m The QDomElement to be analyzed.
+ * @param r The ExperimentFileModel to be updated.
+ * @param dir The QDir object representing the directory of the XML file.
+ * @param _file The path of the XML file.
+ * @param mutex The QMutex object for thread safety.
+ * @param processed The set of processed positions.
+ * @return The error string, if any.
+ */
 QString analyseDomElement(QDomElement m, ExperimentFileModel* r,
                           QDir dir, QString _file, QMutex* mutex, QSet<QPoint>& processed )
 {
@@ -115,6 +131,10 @@ QString analyseDomElement(QDomElement m, ExperimentFileModel* r,
 
     return _error;
 }
+
+
+
+
 
 ExperimentFileModel *YokogawaLoader::getExperimentModel(QString _file)
 {
