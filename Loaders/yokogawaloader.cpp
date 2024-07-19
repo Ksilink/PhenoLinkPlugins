@@ -33,7 +33,8 @@ QString analyseDomElement(QDomElement m, ExperimentFileModel* r,
 {
     QString _error;
 
-    int row = -1, col = -1, isImage = false, action = 0;
+    bool isImage = false;
+    int row = -1, col = -1,  action = 0;
     int timepoint = 0, fieldidx = 0, zindex = 0, channel = 0;
 
     for (int i = 0; i < m.attributes().count(); ++i)
@@ -68,7 +69,10 @@ QString analyseDomElement(QDomElement m, ExperimentFileModel* r,
                     .arg(timepoint).arg(fieldidx).arg(zindex).arg(channel)
                     .arg(QString("%1%2").arg(QLatin1Char('A'+row)).arg((int)(col+1), 2, 10, QChar('0')));
             qDebug() << err;
+            mutex->lock();
             _error += err;
+            mutex->unlock();
+
         }
     }
 

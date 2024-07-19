@@ -67,7 +67,7 @@ target_link_libraries(PhenoLinkArrayScan  PhenoLinkCore Qt::Gui Qt::Core Qt::Xml
 
 install(TARGETS PhenoLinkArrayScan COMPONENT PluginLoader DESTINATION bin/plugins)
 
-
+######################
 
 add_library(PhenoLinkMetadataGenericLoader SHARED
                                 PhenoLinkMetadataGenericLoader.cpp PhenoLinkMetadataGenericLoader.h)
@@ -83,4 +83,27 @@ add_dependencies (PhenoLinkMetadataGenericLoader  PhenoLinkCore)
 target_link_libraries(PhenoLinkMetadataGenericLoader  PhenoLinkCore Qt::Gui Qt::Core Qt::Xml Qt::Concurrent )
 
 install(TARGETS PhenoLinkMetadataGenericLoader COMPONENT PluginLoader DESTINATION bin/plugins)
+
+
+################ CZI Carl Zeiss Imaging Support
+
+
+if (BUILD_CARL_ZEISS_IMAGING_SUPPORT)
+
+add_library(PhenoLinkCarlZeissImagingLoader SHARED
+                                CarlZeissImaging.cpp CarlZeissImaging.h)
+
+target_compile_definitions(PhenoLinkCarlZeissImagingLoader PUBLIC  -DGitPluginDate=${plugin_date})
+
+
+set_target_properties(PhenoLinkCarlZeissImagingLoader
+                PROPERTIES
+                RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/plugins)
+
+add_dependencies (PhenoLinkCarlZeissImagingLoader  PhenoLinkCore)
+target_link_libraries(PhenoLinkCarlZeissImagingLoader  PhenoLinkCore ${CZI_LIB} Qt::Gui Qt::Core Qt::Xml Qt::Concurrent  )
+
+install(TARGETS PhenoLinkCarlZeissImagingLoader COMPONENT PluginLoader DESTINATION bin/plugins)
+
+endif(BUILD_CARL_ZEISS_IMAGING_SUPPORT)
 
