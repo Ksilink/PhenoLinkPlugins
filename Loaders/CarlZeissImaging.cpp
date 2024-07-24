@@ -13,13 +13,31 @@
 //#include "libCZI_Config.h"
 #include "CZIReader.h"
 
+QDebug operator<<(QDebug dbg, const QDomNode& node)
+{
+    QString s;
+    QTextStream str(&s, QIODevice::WriteOnly);
+    node.save(str, 2);
+    dbg << qPrintable(s);
+    return dbg;
+}
+
+QDebug operator<<(QDebug dbg, const QDomElement& node)
+{
+    QString s;
+    QTextStream str(&s, QIODevice::WriteOnly);
+    node.save(str, 2);
+    dbg << qPrintable(s);
+    return dbg;
+}
+
 
 ExperimentFileModel *CZILoader::getExperimentModel(QString _file)
 {
     _error = QString();
     ExperimentFileModel* r = new ExperimentFileModel();
 
-    QStringList sfile = _file.split("/"); if (sfile.size() == 1) sfile = _file.split("\\");  sfile.pop_back();
+    QStringList sfile = _file.split("/"); if (sfile.size() == 1) sfile = _file.split("\\"); // sfile.pop_back();
 
     // Basic metadata from file
 
@@ -30,11 +48,15 @@ ExperimentFileModel *CZILoader::getExperimentModel(QString _file)
     auto cziReader = libCZI::CreateCZIReader();
     cziReader->Open(stream);
 
+    QString name = sfile.back(); name.chop(4);
+
     r->setGroupName(sfile.at(std::max(0, (int)(sfile.count()-2))));
-    r->setName(sfile.back());
+    r->setName(name);
     r->addMetadataFile(_file);
 
     auto seg_metadata = cziReader->ReadMetadataSegment().get()->CreateMetaFromMetadataSegment();
+
+    QMap<int, QDomElement> scene_map;
 
     if (seg_metadata->IsXmlValid())
     {
@@ -43,189 +65,140 @@ ExperimentFileModel *CZILoader::getExperimentModel(QString _file)
         // qDebug() << ;
 
         QDomDocument doc("CZI");
-        if (!doc.setContent(QString::fromStdString(metadata)))
+        if (!doc.setContent(QString::fromStdString(metadata).replace("\r\n","")))
         {
             qDebug() << "Not loading" << _file;
             _error += QString("Error openning file %1\r\n").arg(_file);
             return r;
         }
 
-        // doc.firstChildElement("");
-        qDebug() << doc.toString();
 
-        // Need to dig into the Xml structures to extract infos regarding the positions, etc..
-    }
+        // from czi lib / metadata
+        //   ImageDocument.Metadata.Information.Image.Dimensions.S.Scenes.Scene
+        //   ImageDocument/Metadata/Information/Image/Dimensions/S/Scenes
 
-    // cziReader->mo
+        auto id= doc.firstChildElement("ImageDocument");
+        auto md = id.firstChildElement("Metadata");
+        auto inf = md.firstChildElement("Information");
+        auto img = inf.firstChildElement("Image");
+        auto dim  = img.firstChildElement("Dimensions");
+        auto s = dim.firstChildElement("S");
+        auto scenes = s.firstChildElement("Scenes");
+        auto scene = scenes.firstChildElement("Scene");
 
-    cziReader->EnumerateSubBlocks(
-        [r](int idx, const libCZI::SubBlockInfo& info)
+
+        while (!scene.isNull())
         {
 
-            std::string tmp = libCZI::Utils::DimCoordinateToString(&info.coordinate);
-
-            // SequenceFileModel& seq = (*r)(row, col);
-            // seq.setOwner(r);
-
+            scene_map[scene.attributes().namedItem("Index").nodeValue().toInt()] = scene;
+            scene = scene.nextSiblingElement("Scene");
+        }
 
 
+        auto xp = md.firstChildElement("Experiment");
+        // qDebug() << "XP" << xp;
+        auto xpb = xp.firstChildElement("ExperimentBlocks");
+        // qDebug() << "XPB" << xpb;
+        auto ab = xpb.firstChildElement("AcquisitionBlock");
+        // qDebug() << "ab" << ab;
+        auto sds = ab.firstChildElement("SubDimensionSetups");
+        // qDebug() << "sds" << sds;
+        auto rs = sds.firstChildElement("RegionsSetup");
+        // qDebug() << "rs" << rs;
+        auto sh = rs.firstChildElement("SampleHolder");
+        // qDebug() << "sh" << sh;
+        auto templ = sh.firstChildElement("Template");
+        // qDebug() << "temp" << templ;
 
-            // info.coordinate.IsValid(x);
+
+        // qDebug() << templ.firstChildElement("ShapeRows") << templ.firstChildElement("ShapeColumns");
 
 
-            qDebug() << "Index" << idx
-                     << QString::fromStdString(tmp)
-                     << " Rect=" << info.logicalRect.x << info.logicalRect.y
-                     << info.logicalRect.w << info.logicalRect.h
-                     << info.physicalSize.w << info.physicalSize.h
+        int rows = templ.firstChildElement("ShapeRows").text().toInt();
+        r->setRowCount(rows);
+        int cols = templ.firstChildElement("ShapeColumns").text().toInt();
+        r->setColCount(cols);
+        qDebug() << rows << cols;
 
-                     <<info.coordinate.GetNumberOfValidDimensions();
-                ;
+
+    }
+    else
+    {
+        qDebug() << "Missing XML description of plate in" << _file;
+        _error += QString("Missing XML description of plate in %1\r\n").arg(_file);
+        return r;
+    }
+
+
+// /ImageDocument/Metadata/Experiment//AcquisitionBlock/SubDimensionSetups/RegionsSetup/SampleHolder/Template/
+
+
+
+
+    QMap<int, QMap<int, QMap<int, int> > > field_counter;
+
+    QString file_no_ext=_file;
+    file_no_ext.chop(4); // remove .czi
+
+
+    cziReader->EnumerateSubBlocks(
+        [r, &scene_map, &field_counter, &file_no_ext](int idx, const libCZI::SubBlockInfo& info)
+        {
+
+            int coordS, coordC;
+
+            if (info.coordinate.TryGetPosition(libCZI::DimensionIndex::S, &coordS) &&
+                info.coordinate.TryGetPosition(libCZI::DimensionIndex::C, &coordC))
+            {
+
+                std::string tmp = libCZI::Utils::DimCoordinateToString(&info.coordinate);
+
+                auto scene = scene_map[coordS];
+
+                QString well = scene.attributes().namedItem("Name").nodeValue();
+                QPoint p = ExperimentDataTableModel::stringToPos(well);
+
+                SequenceFileModel& seq = (*r)(p);
+                seq.setOwner(r);
+
+
+                int t = 0, z = 0;
+                if (!info.coordinate.TryGetPosition(libCZI::DimensionIndex::T, &t))
+                    t = 0;
+                if (!info.coordinate.TryGetPosition(libCZI::DimensionIndex::Z, &z))
+                    z=0;
+
+
+                field_counter[coordS][coordC][z] = field_counter[coordS][coordC][z]+1;
+                int field = field_counter[coordS][coordC][z];
+
+
+                seq.setProperties(QString("f%1s%2t%3c%4%5").arg(field).arg(z).arg(t).arg(coordC+1).arg("X"), QString("%1").arg(info.logicalRect.x));
+                seq.setProperties(QString("f%1s%2t%3c%4%5").arg(field).arg(z).arg(t).arg(coordC+1).arg("Y"), QString("%1").arg(info.logicalRect.y));
+                // seq.setProperties(QString("f%1s%2t%3c%4%5").arg(field).arg(z).arg(t).arg(c).arg("Z"), z);
+
+
+
+                seq.addFile(t, field, z, coordC+1, QString("%1.%2.czi").arg(file_no_ext).arg(idx) );
+                seq.checkValidity();
+
+                r->setMeasurements(p, true);
+
+            }
+            else
+            {
+                QString msg = QString("Unable to retrieve a scene from file %1").arg(file_no_ext+".czi");
+                qDebug() <<  msg;
+
+                return false;
+            }
+
+
 
             return true;
         });
 
 
-
-/*
-
-
-    r->setProperties("ChannelCount", QString("%1").arg(channel_checker.size()));
-
-    mrf.seek(0);
-    QCryptographicHash hash(QCryptographicHash::Md5);
-
-    hash.addData(&mrf);
-
-    r->setProperties("hash", hash.result().toHex());
-    r->setProperties("file", _file);
-
-    mrf.close();
-
-
-
-    QDir dir(_file); dir.cdUp();
-    QString _mlf = dir.absolutePath() + "/MeasurementData.mlf";
-
-    QFile mlf(_mlf);
-    r->addMetadataFile(_mlf);
-
-    if (!mlf.open(QIODevice::ReadOnly))
-    {
-        qDebug() << "Error opening file" << _mlf;
-        _error += QString("Error opening file %1").arg(_mlf);
-        return 0;
-    }
-
-
-    QDomDocument d("mlf");
-
-    if (!d.setContent(&mlf))
-    {
-        qDebug() << "Not loading" << _mlf;
-        _error += QString("Error opening file %1").arg(_mlf);
-        mlf.close();
-        return 0;
-    }
-
-
-
-    QDomElement m = d.firstChildElement("bts:MeasurementData").firstChildElement("bts:MeasurementRecord");
-
-    QList<QDomElement> stack;
-
-    do
-    {
-        stack.push_back(m.cloneNode(true).toElement());
-        m = m.nextSiblingElement();
-    } while (!m.isNull());
-
-    QSet<QPoint> processed;
-
-    QMutex mutex;
-    auto analyseDomElemFunc = std::bind(analyseDomElement, std::placeholders::_1,
-                                        r, dir, _file, &mutex, processed);
-    QStringList errs =  QtConcurrent::blockingMapped(&threads, stack, analyseDomElemFunc);
-
-    foreach (QString e, errs)
-    {
-        if (!e.isEmpty())
-            _error += e;
-    }
-
-    QString MesSettings = r->property("MeasurementSettingFileName");
-
-
-    dir = QDir(_file); dir.cdUp();
-    QString _mes = dir.absolutePath() + "/" +MesSettings;
-    r->addMetadataFile(_mes);
-
-
-    QFile mes(_mes);
-
-
-
-    if (!mes.open(QIODevice::ReadOnly))
-    {
-        qDebug() << "Error opening file" << _mes;
-        _error += QString("Error opening file %1").arg(_mes);
-        return 0;
-    }
-
-
-    d = QDomDocument("mes");
-
-
-
-
-    if (!d.setContent(&mes))
-    {
-        qDebug() << "Not loading" << _mes;
-        _error += QString("Error oppenning file %1\r\n").arg(_mes);
-        mes.close();
-        return r;
-    }
-
-
-    // Search for "ChannelList" && for each Channel description: Color field
-
-    m = d.firstChildElement("bts:MeasurementSetting").firstChildElement("bts:ChannelList").firstChildElement("bts:Channel");
-    //    qDebug() << d.firstChildElement("bts:MeasurementSetting").tagName();
-    int binning = -1;
-    QStringList chans;
-    do
-    {
-        QString ch = m.attribute("bts:Ch");
-        if (channel_checker.contains(ch))
-        {
-            QString color = m.attribute("bts:Color");
-            //            qDebug() << "channel" << ch << "Color" << color;
-            r->setProperties("ChannelsColor"+ch, color);
-            QString nm = m.attribute("bts:Target") + " " + m.attribute("bts:Fluorophore");
-            nm = nm.replace("Microscope Image ", "");
-            if (nm.isEmpty())
-                nm = ch; // Force a channel number as a name if Empty !!
-            chans << nm;
-        }
-        int  b = m.attribute("bts:Binning").toInt();
-
-        if (binning == -1)
-            binning = b;
-        else if (binning != b)
-        {
-            auto e = QString("Discrepancy in the binning ! cancelling the load");
-            qDebug() << e;
-            _error += e;
-            delete r;
-            return NULL;
-        }
-
-        m = m.nextSiblingElement();
-    } while (!m.isNull());
-
-    r->setChannelNames(chans);
-    // qDebug() << chans;
-*/
 
     return r;
 }
