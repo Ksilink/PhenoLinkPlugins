@@ -133,9 +133,9 @@ QString analyseDomElement(QDomElement m, ExperimentFileModel* r,
     QString z = m.firstChildElement("PositionZ").text();
 
     mutex->lock();
-    seq.setProperties(QString("f%1s%2t%3c%4%5").arg(fieldidx).arg(zindex).arg(timepoint).arg(channel).arg("X"), x);
-    seq.setProperties(QString("f%1s%2t%3c%4%5").arg(fieldidx).arg(zindex).arg(timepoint).arg(channel).arg("Y"), y);
-    seq.setProperties(QString("f%1s%2t%3c%4%5").arg(fieldidx).arg(zindex).arg(timepoint).arg(channel).arg("Z"), z);
+    seq.setProperties(QString("%6f%1s%2t%3c%4%5").arg(fieldidx).arg(zindex).arg(timepoint).arg(channel).arg("X").arg(seq.Pos()), x);
+    seq.setProperties(QString("%6f%1s%2t%3c%4%5").arg(fieldidx).arg(zindex).arg(timepoint).arg(channel).arg("Y").arg(seq.Pos()), y);
+    seq.setProperties(QString("%6f%1s%2t%3c%4%5").arg(fieldidx).arg(zindex).arg(timepoint).arg(channel).arg("Z").arg(seq.Pos()), z);
     mutex->unlock();
 
 

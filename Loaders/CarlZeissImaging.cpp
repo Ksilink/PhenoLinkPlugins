@@ -156,6 +156,7 @@ ExperimentFileModel *CZILoader::getExperimentModel(QString _file)
                 auto scene = scene_map[coordS];
 
                 QString well = scene.attributes().namedItem("Name").nodeValue();
+
                 QPoint p = ExperimentDataTableModel::stringToPos(well);
 
                 SequenceFileModel& seq = (*r)(p);
@@ -173,13 +174,15 @@ ExperimentFileModel *CZILoader::getExperimentModel(QString _file)
                 int field = field_counter[coordS][coordC][z];
 
 
-                seq.setProperties(QString("f%1s%2t%3c%4%5").arg(field).arg(z).arg(t).arg(coordC+1).arg("X"), QString("%1").arg(info.logicalRect.x));
-                seq.setProperties(QString("f%1s%2t%3c%4%5").arg(field).arg(z).arg(t).arg(coordC+1).arg("Y"), QString("%1").arg(info.logicalRect.y));
+                seq.setProperties(QString("%6f%1s%2t%3c%4%5").arg(field).arg(z+1).arg(t+1).arg(coordC+1).arg("X").arg(well), QString("%1").arg(info.logicalRect.x));
+                seq.setProperties(QString("%6f%1s%2t%3c%4%5").arg(field).arg(z+1).arg(t+1).arg(coordC+1).arg("Y").arg(well), QString("%1").arg(info.logicalRect.y));
                 // seq.setProperties(QString("f%1s%2t%3c%4%5").arg(field).arg(z).arg(t).arg(c).arg("Z"), z);
 
+                // qDebug() << well << tmp << info.logicalRect.x << info.logicalRect.y;
 
 
-                seq.addFile(t, field, z, coordC+1, QString("%1.%2.czi").arg(file_no_ext).arg(idx) );
+
+                seq.addFile(t+1, field, z+1, coordC+1, QString("%1.%2.czi").arg(file_no_ext).arg(idx) );
                 seq.checkValidity();
 
                 r->setMeasurements(p, true);

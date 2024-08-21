@@ -91,7 +91,7 @@ QString analyseDomElement(QDomElement m, ExperimentFileModel* r,
             if (skipL.contains(tag) || (tag == "Type" && (a.nodeValue() == "IMG" || a.nodeValue() == "ERR" )))
                 continue; // skip already stored data
 
-            QString mtag = QString("f%1s%2t%3c%4%5").arg(fieldidx).arg(zindex).arg(timepoint).arg(channel).arg(tag);
+            QString mtag = QString("%6f%1s%2t%3c%4%5").arg(fieldidx).arg(zindex).arg(timepoint).arg(channel).arg(tag).arg(seq.Pos());
             mutex->lock();
             seq.setProperties(mtag, a.nodeValue());
             mutex->unlock();
