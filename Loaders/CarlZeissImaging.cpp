@@ -71,8 +71,19 @@ ExperimentFileModel *CZILoader::getExperimentModel(QString _file)
             _error += QString("Error openning file %1\r\n").arg(_file);
             return r;
         }
-
-
+        {
+            QFile file("c:/Temp/LastCZI.xml");
+            if (!file.open(QIODevice::WriteOnly))
+            {
+                qDebug() << "Not Exporting CZI xml to file (c:/Temp/LastCZI.xml)" ;
+            }
+            else
+            {
+                QTextStream out(&file);
+                out << doc.toString();
+                file.close();
+            }
+        }
         // from czi lib / metadata
         //   ImageDocument.Metadata.Information.Image.Dimensions.S.Scenes.Scene
         //   ImageDocument/Metadata/Information/Image/Dimensions/S/Scenes
@@ -86,13 +97,40 @@ ExperimentFileModel *CZILoader::getExperimentModel(QString _file)
         auto scenes = s.firstChildElement("Scenes");
         auto scene = scenes.firstChildElement("Scene");
 
-
         while (!scene.isNull())
         {
 
             scene_map[scene.attributes().namedItem("Index").nodeValue().toInt()] = scene;
             scene = scene.nextSiblingElement("Scene");
         }
+
+
+        // /ImageDocument/Metadata/Information/Image/Dimensions/Channels/Channel[1]
+
+
+        auto chans = dim.firstChildElement("Channels");
+        auto chan = chans.firstChildElement("Channel");
+        QMap<int, QString> channel_map;
+        QMap<QString, QString> chan_colors;
+        while (!chan.isNull())
+        {
+            int chid = 1+chan.attributes().namedItem("Id").nodeValue().split(":").last().toInt();
+            auto name = chan.attributes().namedItem("Name").nodeValue();
+            auto color = chan.firstChildElement("Color").text();
+            chan_colors[QString("ChannelsColor%1").arg(chid)] =  color;
+
+            channel_map[chid] = name;
+
+            chan = chan.nextSiblingElement("Channel");
+        }
+
+        for (auto c=chan_colors.begin(); c != chan_colors.end(); ++c)
+            r->setProperties(c.key(), c.value());
+
+        QStringList cnames;
+        for (auto v: channel_map)
+            cnames << v;
+        r->setChannelNames(cnames);
 
 
         auto xp = md.firstChildElement("Experiment");
@@ -121,6 +159,7 @@ ExperimentFileModel *CZILoader::getExperimentModel(QString _file)
         qDebug() << rows << cols;
 
 
+
     }
     else
     {
@@ -135,7 +174,7 @@ ExperimentFileModel *CZILoader::getExperimentModel(QString _file)
 
 
 
-    QMap<int, QMap<int, QMap<int, int> > > field_counter;
+    QMap<QString, QMap<int, QMap<int,  QMap<int, int>> > > field_counter;
 
     QString file_no_ext=_file;
     file_no_ext.chop(4); // remove .czi
@@ -155,30 +194,44 @@ ExperimentFileModel *CZILoader::getExperimentModel(QString _file)
 
                 auto scene = scene_map[coordS];
 
-                QString well = scene.attributes().namedItem("Name").nodeValue();
+                QString well;
+
+                auto arrayname = scene.firstChildElement("ArrayName");
+
+                if (arrayname.text().isEmpty())
+                {
+                    well = scene.attributes().namedItem("Name").nodeValue();
+                }
+                    else
+                {
+                    well = arrayname.text();
+                }
 
                 QPoint p = ExperimentDataTableModel::stringToPos(well);
 
                 SequenceFileModel& seq = (*r)(p);
                 seq.setOwner(r);
 
-
-                int t = 0, z = 0;
-                if (!info.coordinate.TryGetPosition(libCZI::DimensionIndex::T, &t))
-                    t = 0;
+                int z = 0;
                 if (!info.coordinate.TryGetPosition(libCZI::DimensionIndex::Z, &z))
                     z=0;
 
+                field_counter[well][coordS][coordC][z] = field_counter[well][coordS][coordC][z]+1;
+                int field = field_counter[well][coordS][coordC][z];
 
-                field_counter[coordS][coordC][z] = field_counter[coordS][coordC][z]+1;
-                int field = field_counter[coordS][coordC][z];
+                int t = 0;
+                if (!info.coordinate.TryGetPosition(libCZI::DimensionIndex::T, &t))
+                    t = 0;
+                else
+                    field = 1;
+
 
 
                 seq.setProperties(QString("%6f%1s%2t%3c%4%5").arg(field).arg(z+1).arg(t+1).arg(coordC+1).arg("X").arg(well), QString("%1").arg(info.logicalRect.x));
                 seq.setProperties(QString("%6f%1s%2t%3c%4%5").arg(field).arg(z+1).arg(t+1).arg(coordC+1).arg("Y").arg(well), QString("%1").arg(info.logicalRect.y));
                 // seq.setProperties(QString("f%1s%2t%3c%4%5").arg(field).arg(z).arg(t).arg(c).arg("Z"), z);
 
-                // qDebug() << well << tmp << info.logicalRect.x << info.logicalRect.y;
+                qDebug() << well << tmp << info.logicalRect.x << info.logicalRect.y;
 
 
 
