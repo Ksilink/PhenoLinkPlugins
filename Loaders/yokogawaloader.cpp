@@ -116,7 +116,9 @@ QString analyseDomElement(QDomElement m, ExperimentFileModel* r,
         if (!m.childNodes().at(0).nodeValue().isEmpty() && isImage)
         {
             QString file = QString("%1/%2").arg(dir.absolutePath(), m.childNodes().at(0).nodeValue());
-
+            if (!(file.endsWith(".tif") || file.endsWith(".tiff") || file.endsWith(".jxl")))
+                file = QString();
+            
             mutex->lock();
             seq.addFile(timepoint, fieldidx, zindex, channel, file);
             mutex->unlock();
