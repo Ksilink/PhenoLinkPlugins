@@ -112,27 +112,32 @@ QString analyseDomElement(QDomElement m, ExperimentFileModel* r,
         r->setMeasurements(QPoint(row, col), isImage);
 
         mutex->unlock();
+        if (channel != 0 && timepoint != 0 && fieldidx != 0 && zindex = 0)
+        {
+            if (!m.childNodes().at(0).nodeValue().isEmpty() && isImage)
+            {
+                QString file = QString("%1/%2").arg(dir.absolutePath(), m.childNodes().at(0).nodeValue());
+                if (!(file.endsWith(".tif") || file.endsWith(".tiff") || file.endsWith(".jxl")))
+                    file = QString();
 
-        if (!m.childNodes().at(0).nodeValue().isEmpty() && isImage)
-        {
-            QString file = QString("%1/%2").arg(dir.absolutePath(), m.childNodes().at(0).nodeValue());
-            if (!(file.endsWith(".tif") || file.endsWith(".tiff") || file.endsWith(".jxl")))
-                file = QString();
-            
+
+                mutex->lock();
+                seq.addFile(timepoint, fieldidx, zindex, channel, file);
+                mutex->unlock();
+            }
+            else
+            {
+                mutex->lock();
+                if (seq.hasFile(timepoint, fieldidx, zindex, channel))
+                    seq.addFile(timepoint, fieldidx, zindex, channel, QString());
+                mutex->unlock();
+            }
+
+
             mutex->lock();
-            seq.addFile(timepoint, fieldidx, zindex, channel, file);
+            seq.checkValidity();
             mutex->unlock();
         }
-        else
-        {
-            mutex->lock();
-            if (seq.hasFile(timepoint, fieldidx, zindex, channel))
-                seq.addFile(timepoint, fieldidx, zindex, channel, QString());
-            mutex->unlock();
-        }
-        mutex->lock();
-        seq.checkValidity();
-        mutex->unlock();
     }
 
     return _error;
