@@ -112,7 +112,7 @@ QString analyseDomElement(QDomElement m, ExperimentFileModel* r,
         r->setMeasurements(QPoint(row, col), isImage);
 
         mutex->unlock();
-        if (channel != 0 && timepoint != 0 && fieldidx != 0 && zindex = 0)
+        if (channel != 0 && timepoint != 0 && fieldidx != 0 && zindex != 0)
         {
             if (!m.childNodes().at(0).nodeValue().isEmpty() && isImage)
             {
