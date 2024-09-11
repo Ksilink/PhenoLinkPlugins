@@ -17,15 +17,19 @@
 
 
 
-void GenericLoader::parseFolders(QDir folder, QString pattern, ExperimentFileModel* efm)
+void GenericLoader::parseFolders(QDir folder, QString pattern, ExperimentFileModel* efm, QString well)
 {
 
     QStringList matchers = pattern.split("(", Qt::SkipEmptyParts);
     QString pattern_simpl = pattern;
+    int offset = 0;
     for (int i = 0; i < matchers.size(); ++i)
     {
         QString mat = matchers[i].split(":").front();
+        if (!matchers[i].contains(":")) offset++;
+
         matchers[i] = mat;
+
         pattern_simpl = pattern_simpl.replace(matchers[i]+":", "");
     }
 
@@ -51,9 +55,17 @@ void GenericLoader::parseFolders(QDir folder, QString pattern, ExperimentFileMod
                 // Row & Col
 //                "image_matcher": "(ChanName:.*)_(WellRow:[A-Z])_(WellCol:[0-9]{3})_r_(FieldX:[0-9]{4})_c_(FieldY:[0-9]{4})_t_(TimePoint:[0-9]{8})_z_(Zpos:[0-9]{4}).tif",
                 int row = 0, col = 0;
+
+                if (!well.isEmpty())
+                {
+                    QPoint pt = ExperimentDataTableModel::stringToPos(well);
+                    row = pt.x();
+                    col = pt.y();
+                }
+
                 if (matchers.contains("Well"))
                 {
-                    int idx = matchers.indexOf("Well")+1;
+                    int idx = matchers.indexOf("Well");
                     QPoint pt = ExperimentDataTableModel::stringToPos(matches.at(idx));
                     row = pt.x();
                     col = pt.y();
@@ -61,14 +73,14 @@ void GenericLoader::parseFolders(QDir folder, QString pattern, ExperimentFileMod
                 else if (matchers.contains("WellRow") && matchers.contains("WellCol"))
                 {
 
-                    int idx = matchers.indexOf("WellRow")+1;
+                    int idx = matchers.indexOf("WellRow");
 
                     bool ok;
                     row  = matches[idx].toInt(&ok);
                     if (!ok)
                         row = (matches[idx].at(0).toLatin1() - 'A');
 
-                    idx = matchers.indexOf("WellCol")+1;
+                    idx = matchers.indexOf("WellCol");
                     col = matches[idx].toInt(&ok);
                 }
 
@@ -78,29 +90,30 @@ void GenericLoader::parseFolders(QDir folder, QString pattern, ExperimentFileMod
 
                 if (matchers.contains("TimePoint"))
                 {
-                    timepoint  = matches[matchers.indexOf("TimePoint")+1].toInt();
+                    timepoint  = matches[matchers.indexOf("TimePoint")].toInt();
                 }
                 if (matchers.contains("Zpos"))
                 {
-                    zpos  = matches[matchers.indexOf("Zpos")+1].toInt()+1;
+                    zpos  = matches[matchers.indexOf("Zpos")].toInt()+1;
                 }
                 if (matchers.contains("Channel"))
                 {
-                    channel  = matches[matchers.indexOf("Channel")+1].toInt();
+                    channel  = matches[matchers.indexOf("Channel")].toInt();
                 }
                 if (matchers.contains("Field"))
                 {
-                    fieldidx  = matches[matchers.indexOf("Field")+1].toInt();
+                    fieldidx  = matches[matchers.indexOf("Field")].toInt();
 
                 }
                 else if (matchers.contains("FieldX") && matchers.contains("FieldY"))
                 {
-                    fieldidx = matches[matchers.indexOf("FieldX")+1].toInt() + 100 * matches[matchers.indexOf("FieldY")+1].toInt();
+                    fieldidx = matches[matchers.indexOf("FieldX")].toInt() + 100 * 
+                        matches[matchers.indexOf("FieldY")].toInt();
                 }
 
                 if (matchers.contains("ChanName"))
                 {
-                    QString cn = matches[matchers.indexOf("ChanName")+1];
+                    QString cn = matches[matchers.indexOf("ChanName")];
 
                     if (!chans.contains(cn))
                     {
@@ -156,36 +169,78 @@ ExperimentFileModel *GenericLoader::getExperimentModel(QString _file)
         return nullptr;
     }
 
-    QString pattern = doc["image_matcher"].toString();
-
-    QStringList path = _file.replace("\\", "/").split("/");
-    path.pop_back();
-    QDir base(path.join("/"));
-
     ExperimentFileModel* r = new ExperimentFileModel();
 
-    if (doc.contains("subfolder"))
+
+    if (doc["image_matcher"].isObject())
     {
 
-        auto arr = doc["subfolder"].toArray();
-        for (auto sub : arr)
-        {
-            base.cd(sub.toString());
-            parseFolders(base.canonicalPath(), pattern, r);
-            base.cdUp();
-        }
+		auto obj = doc["image_matcher"].toObject();
+		for (auto objkey : obj.keys())
+		{
+
+            QString pattern = obj[objkey].toString();
+
+            QStringList path = _file.replace("\\", "/").split("/");
+            path.pop_back();
+            QDir base(path.join("/"));
+
+            if (doc.contains("subfolder"))
+            {
+
+                auto arr = doc["subfolder"].toArray();
+                for (auto sub : arr)
+                {
+                    base.cd(sub.toString());
+                    parseFolders(base.canonicalPath(), pattern, r, objkey);
+                    base.cdUp();
+                }
+
+            }
+            else
+            {
+                auto entries = base.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+                for (auto& sub : entries)
+                {
+                    base.cd(sub);
+                    parseFolders(base.canonicalPath(), pattern, r, objkey);
+                    base.cdUp();
+                }
+            }
+		}
 
     }
     else
     {
-        auto entries = base.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
-        for (auto& sub: entries)
-        {
-            base.cd(sub);
-            parseFolders(base.canonicalPath(), pattern, r);
-            base.cdUp();
-        }
 
+        QString pattern = doc["image_matcher"].toString();
+
+        QStringList path = _file.replace("\\", "/").split("/");
+        path.pop_back();
+        QDir base(path.join("/"));
+
+        if (doc.contains("subfolder"))
+        {
+
+            auto arr = doc["subfolder"].toArray();
+            for (auto sub : arr)
+            {
+                base.cd(sub.toString());
+                parseFolders(base.canonicalPath(), pattern, r);
+                base.cdUp();
+            }
+
+        }
+        else
+        {
+            auto entries = base.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+            for (auto& sub : entries)
+            {
+                base.cd(sub);
+                parseFolders(base.canonicalPath(), pattern, r);
+                base.cdUp();
+            }
+        }
     }
     r->setProperties("RowCount", QString::number(nrows + 1));
     r->setProperties("ColumnCount", QString::number(ncols + 1));
@@ -205,7 +260,13 @@ ExperimentFileModel *GenericLoader::getExperimentModel(QString _file)
         {
             r->setProperties(key, doc[key].toString());
         }
-
+    if (doc.contains("Channels"))
+    {
+        QStringList chans;
+        for (auto v : doc["Channels"].toArray().toVariantList())
+            chans << v.toString();
+        r->setChannelNames(chans);
+    }
 
     return r;
 }

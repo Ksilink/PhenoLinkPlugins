@@ -36,7 +36,7 @@ public:
 
 protected:
 
-  void parseFolders(QDir folder, QString pattern, ExperimentFileModel* efm);
+  void parseFolders(QDir folder, QString pattern, ExperimentFileModel* efm, QString well = QString());
 
 
   QString _error;
