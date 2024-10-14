@@ -1,5 +1,5 @@
-#ifndef PROCESSINGSPEEDTESTING_H
-#define PROCESSINGSPEEDTESTING_H
+#ifndef ZStackProjection_H
+#define ZStackProjection_H
 #include <QtPlugin>
 #include <QString>
 
@@ -10,14 +10,14 @@
 #include "Core/checkoutprocessplugininterface.h"
 #include <PhenoLinkPluginCore/PhenoLinkPluginCore.h>
 
-class ProcessingSpeedTesting : public QObject, public PhenoLinkPluginCore
+class ZStackProjection : public QObject, public PhenoLinkPluginCore
 {
     Q_OBJECT
     Q_PLUGIN_METADATA(IID CheckoutProcessPluginInterface_iid)
     Q_INTERFACES(CheckoutProcessPluginInterface)
 
 public:
-    ProcessingSpeedTesting();
+    ZStackProjection();
 
     virtual CheckoutProcessPluginInterface* clone();
     virtual void exec();
@@ -46,4 +46,4 @@ protected: // outputs
 
 };
 
-#endif // PROCESSINGSPEEDTESTING_H
+#endif // ZStackProjection

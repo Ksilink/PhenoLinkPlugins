@@ -1,14 +1,13 @@
-#include "processingspeedtesting.h"
-#include <201607/AlgorithmCommon.h>
+#include "ZStackProjection.h"
 
 
-ProcessingSpeedTesting::ProcessingSpeedTesting()
+ZStackProjection::ZStackProjection()
 {
-    description("Tools/Speed/Speed Testing",
+    description("Tools/ZStack Projection",
                 QStringList() << "wiest.daessle@gmail.com",
-                "Performance test : network load and computation simulator");
+                "Tool to perform (boosted) Max Projection");
 
-    use(&image, "input-image", "Input Image")
+    use(&images, "input-image", "Input Image")
         .noImageAutoLoading()
         .channelsAsVector() // This process does handle all the channels together,
         .withProperties(QStringList() << "X" << "Y" << "HorizontalPixelDimension" << "VerticalPixelDimension")
@@ -39,12 +38,12 @@ ProcessingSpeedTesting::ProcessingSpeedTesting()
 
 }
 
-CheckoutProcessPluginInterface* ProcessingSpeedTesting::clone()
+CheckoutProcessPluginInterface* ZStackProjection::clone()
 {
-    return new ProcessingSpeedTesting();
+    return new ZStackProjection();
 }
 
-void ProcessingSpeedTesting::exec()
+void ZStackProjection::exec()
 {
     time = 0;
 
@@ -57,16 +56,16 @@ void ProcessingSpeedTesting::exec()
         t1 = t2 = std::chrono::high_resolution_clock::now();
         if (option == 1 || option == 2)
         {
-            int channelNb = (int)image.getChannelCount();
+            int channelNb = (int)images.getChannelCount();
 
             if (plugin_semaphore) semaphore.acquire();
 
             for (int chann = 0; chann < channelNb; ++chann)
-                for (unsigned i = 0; i < image.count(); ++i)
+                for (unsigned i = 0; i < images.count(); ++i)
                 {
-                    int count = image.getImage(i, chann, QString(), !plugin_semaphore).total();
-                    if (count == 0)
-                        qDebug() << image.getImageFile(i, chann) << "not loaded";
+                    int count = images.getImage(i, chann, QString(), !plugin_semaphore).total();
+                    // if (count == 0)
+                        // qDebug() << images.getImageFile(i, chann) << "not loaded";
                     pixels += count;
                 }
 

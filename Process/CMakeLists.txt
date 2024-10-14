@@ -17,7 +17,7 @@ function(add_plugin PluginName PluginFile)
             list(APPEND files ${ARGV${index}})
         endif()
     endforeach()
-    list(APPEND files "CheckoutPluginCore/CheckoutPluginCore.h")
+    list(APPEND files "PhenoLinkPluginCore/PhenoLinkPluginCore.h")
 
     include_directories("${PROJECT_BINARY_DIR}/${ONNX_ROOTDIR}/include" "${PROJECT_BINARY_DIR}/${ONNX_ROOTDIR}/include/onnxruntime/core/session")
     link_directories("${PROJECT_BINARY_DIR}/${ONNX_ROOTDIR}/lib")
@@ -25,7 +25,7 @@ function(add_plugin PluginName PluginFile)
     if (BUILD_${PluginName})
 
         add_library(${PluginName} SHARED ${files})
-        message("Starting Git command: ${PLUGIN_PATH} Process/${PluginFile}")
+        message("Starting Git command: ${OPENSOURCE_PLUGIN_PATH} Process/${PluginFile}")
 
         execute_process(
             COMMAND           "${GIT_EXECUTABLE}"
@@ -33,7 +33,7 @@ function(add_plugin PluginName PluginFile)
             -1
             --pretty=format:"%h %ai"
             "Process/${PluginFile}"
-            WORKING_DIRECTORY "${PLUGIN_PATH}"
+            WORKING_DIRECTORY "${OPENSOURCE_PLUGIN_PATH}"
             RESULT_VARIABLE   git_return
             OUTPUT_VARIABLE   hash)
 
