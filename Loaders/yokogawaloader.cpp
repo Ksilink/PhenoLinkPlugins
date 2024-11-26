@@ -125,13 +125,13 @@ QString analyseDomElement(QDomElement m, ExperimentFileModel* r,
                 seq.addFile(timepoint, fieldidx, zindex, channel, file);
                 mutex->unlock();
             }
-            else
-            {
-                mutex->lock();
-                if (seq.hasFile(timepoint, fieldidx, zindex, channel))
-                    seq.addFile(timepoint, fieldidx, zindex, channel, QString());
-                mutex->unlock();
-            }
+            // else
+            // {
+            //     mutex->lock();
+            //     if (seq.hasFile(timepoint, fieldidx, zindex, channel))
+            //         seq.addFile(timepoint, fieldidx, zindex, channel, QString());
+            //     mutex->unlock();
+            // }
 
 
             mutex->lock();
