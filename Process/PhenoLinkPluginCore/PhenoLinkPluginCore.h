@@ -480,7 +480,7 @@ inline cv::Mat SegmentNucleiWathershed(cv::Mat_<Type>& nuc_image, SegmentNucleiO
     cv::Mat labels, stats;
     cv::Mat1d centroids;
 
-    cv::connectedComponentsWithStats(blur > options.threshold, labels, stats, centroids, 4, CV_32S, cv::CCL_WU);
+    cv::connectedComponentsWithStats(blur > options.threshold, labels, stats, centroids, 4, CV_32S, cv::CCL_DEFAULT );
 
     double avg_area = clearOversizeArea((cv::Mat_<int>&)labels, stats, options.min_area, options.max_area);
 
