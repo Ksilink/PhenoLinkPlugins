@@ -98,7 +98,6 @@ ExperimentFileModel *InCellLoader::getExperimentModel(QString _file)
 
     r->addMetadataFile(_file);
 
-    // NOTE: Is the hash computed on the file or the filename, or part of the filename / filepath
     r->setProperties("hash", hash.result().toHex());
     r->setProperties("file", _file);
 

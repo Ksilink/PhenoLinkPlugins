@@ -140,13 +140,14 @@ QString analyseDomElement(QDomElement m, ExperimentFileModel* r,
 
 
     r->setMeasurements(QPoint(row, col), true);
+
     QString url = m.firstChildElement("URL").text();
 
     if (!url.isEmpty())
     {
 
         QString file = QString("%1/%2").arg(dir.absolutePath()).arg(url);
-        //        qDebug() <<row << col << timepoint << fieldidx << zindex << channel<<file;
+        // qDebug() <<row << col << timepoint << fieldidx << zindex << channel<<file;
         if (true /*|| QFileInfo::exists(file)*/)
         {
             mutex->lock();
@@ -179,19 +180,14 @@ ExperimentFileModel *PerkinElmerLoader::getExperimentModel(QString _file)
 {
     QThreadPool threads; threads.setMaxThreadCount(12);
 
-    ExperimentFileModel* r = new ExperimentFileModel();
-
-
-
-
     _error = QString();
-
 
     QFile mrf(_file);
     if (!mrf.open(QFile::ReadOnly))
     {
         qDebug() << "Error opening file" << _file;
         _error += QString("Error oppenning file %1").arg(_file);
+
         return 0;
     }
 
@@ -206,7 +202,6 @@ ExperimentFileModel *PerkinElmerLoader::getExperimentModel(QString _file)
         return 0;
     }
 
-
     // We have the perkin elmer plate, let see what we can extract from that big stuff
 
     QDomElement el = doc.firstChildElement("EvaluationInputData").firstChildElement("Images");
@@ -216,6 +211,7 @@ ExperimentFileModel *PerkinElmerLoader::getExperimentModel(QString _file)
         return 0;
     }
 
+    ExperimentFileModel* r = new ExperimentFileModel();
 
 
 
@@ -238,6 +234,8 @@ ExperimentFileModel *PerkinElmerLoader::getExperimentModel(QString _file)
     r->setRowCount(plate.firstChildElement("PlateRows").text().toInt());
     r->setColCount(plate.firstChildElement("PlateColumns").text().toInt());
 
+    // qDebug() << plate.firstChildElement("PlateRows").text();
+    // qDebug() << plate.firstChildElement("PlateColumns").text();
 
     QDomElement m = el.firstChildElement("Image");
 
@@ -262,8 +260,6 @@ ExperimentFileModel *PerkinElmerLoader::getExperimentModel(QString _file)
             _error += e;
     }
 
-    QStringList chansName;
-
     SequenceFileModel& sfm = r->getFirstValidSequenceFiles();
 
     //m.firstChildElement("")
@@ -273,44 +269,57 @@ ExperimentFileModel *PerkinElmerLoader::getExperimentModel(QString _file)
     do
     {
         int ch = m.firstChildElement("ChannelID").text().toInt();
-        QString name = m.firstChildElement("ChannelName").text();
-        chan_names[ch] = name;
-        if (chan_names.size() > nb_chans)
-            break;
+        auto el = m.firstChildElement("ChannelName");
+        if  (!el.isNull())
+        {
+            QString name = el.text();
+            chan_names[ch] = name;
+            if (chan_names.size() > nb_chans)
+                break;
+        }
         m = m.nextSiblingElement();
     } while (!m.isNull());
 
     if (chan_names.isEmpty())
     {
-        m = doc.firstChildElement("EvaluationInputData").firstChildElement("Maps").firstChildElement("Map");
-        do
-        {
-            int ch = m.firstChildElement("Entry").attribute("ChannelID", "-1").toInt();
-            if (ch != -1)
+
+       auto map = doc.firstChildElement("EvaluationInputData").firstChildElement("Maps").firstChildElement("Map");
+        do {
+            m = map.firstChildElement("Entry");
+            do
             {
-                if ( !m.firstChildElement("Entry").firstChildElement("ChannelName").isNull())
+                auto ent = m;
+                int ch = ent.attribute("ChannelID", "-1").toInt();
+                if (ch != -1)
                 {
-                    QString name = m.firstChildElement("Entry").firstChildElement("ChannelName").text();
-                    chan_names[ch] = name;
-                    if (chan_names.size() > nb_chans)
-                        break;
+                    // qDebug() << ent.attributes();
+                    if ( !ent.firstChildElement("ChannelName").isNull())
+                    {
+                        QString name = ent.firstChildElement("ChannelName").text();
+                        chan_names[ch] = name;
+                        qDebug() << ch << name;
+                        // if (chan_names.size() > nb_chans)
+                        //     break;
+                    }
+
+
+                    if (!r->hasProperty(QString("ChannelColor%1").arg(ch)) && !ent.firstChildElement("MainEmissionWavelength").isNull())
+                    {
+                        float w = ent.firstChildElement("MainEmissionWavelength").text().toFloat();
+                        if (w != 0.0)
+                            r->setProperties(QString("ChannelColor%1").arg(ch),
+                                             QColor(WavelengthToRGB(w)).name(QColor::HexArgb));
+                        else
+                            r->setProperties(QString("ChannelColor%1").arg(ch),
+                                             QColor(Qt::white).name(QColor::HexArgb));
+                    }
+
                 }
+                m = m.nextSiblingElement();
+            } while (!m.isNull());
+            map = map.nextSiblingElement();
 
-
-                if (!r->hasProperty(QString("ChannelColor%1").arg(ch)) && !m.firstChildElement("Entry").firstChildElement("MainEmissionWavelength").isNull())
-                {
-                    float w = m.firstChildElement("Entry").firstChildElement("MainEmissionWavelength").text().toFloat();
-                    if (w != 0.0)
-                        r->setProperties(QString("ChannelColor%1").arg(ch),
-                                         QColor(WavelengthToRGB(w)).name(QColor::HexArgb));
-                    else
-                        r->setProperties(QString("ChannelColor%1").arg(ch),
-                                         QColor(Qt::white).name(QColor::HexArgb));
-                }
-
-            }
-            m = m.nextSiblingElement();
-        } while (!m.isNull());
+        } while (!map.isNull());
 
     }
 
@@ -324,9 +333,6 @@ ExperimentFileModel *PerkinElmerLoader::getExperimentModel(QString _file)
 
     qDebug() << channames;
     //    chansName.reserve();
-
-
-
 
 
     return r;
@@ -355,15 +361,15 @@ QString PerkinElmerLoader::pluginName()
 
 QStringList PerkinElmerLoader::handledFiles()
 {
-    return QStringList() << "Index.xml" <<  "*.idx.xml";
+    return QStringList() << "Index.xml" << "index.xml" <<  "*.idx.xml";
 }
 
 bool PerkinElmerLoader::isFileHandled(QString file)
 {
-
     if (file.endsWith(".idx.xml"))
         return true;
-    if  (file == "Index.xml")
+
+    if  (file.endsWith( "Index.xml") || file.endsWith( "index.xml") )
         return true;
 
     return false;
