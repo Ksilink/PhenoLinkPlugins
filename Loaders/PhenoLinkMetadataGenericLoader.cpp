@@ -20,17 +20,18 @@
 void GenericLoader::parseFolders(QDir folder, QString pattern, ExperimentFileModel* efm, QString well)
 {
 
-    QStringList matchers = pattern.split("(", Qt::SkipEmptyParts);
+    QStringList matchers_init = pattern.split("(", Qt::SkipEmptyParts);
     QString pattern_simpl = pattern;
     int offset = 0;
-    for (int i = 0; i < matchers.size(); ++i)
+    QStringList matchers;
+    for (int i = 0; i < matchers_init.size(); ++i)
     {
-        QString mat = matchers[i].split(":").front();
-        if (!matchers[i].contains(":")) offset++;
+        QString mat = matchers_init[i].split(":").front();
+        if (!matchers_init[i].contains(":")) continue;
 
-        matchers[i] = mat;
+        matchers << mat;
 
-        pattern_simpl = pattern_simpl.replace(matchers[i]+":", "");
+        pattern_simpl = pattern_simpl.replace(mat +":", "");
     }
 
     QRegularExpression exp(pattern_simpl);
@@ -47,10 +48,14 @@ void GenericLoader::parseFolders(QDir folder, QString pattern, ExperimentFileMod
             parseFolders(QDir(entry.filePath()), pattern, efm);
         if (entry.isFile())
         {
+            qDebug() << entry.filePath() << entry.fileName();
             auto match = exp.match(entry.fileName());
             if (match.hasMatch())
             {
                 QStringList matches = match.capturedTexts();
+                // remove first because it captures the whole string
+                matches.removeFirst();
+
 
                 // Row & Col
 //                "image_matcher": "(ChanName:.*)_(WellRow:[A-Z])_(WellCol:[0-9]{3})_r_(FieldX:[0-9]{4})_c_(FieldY:[0-9]{4})_t_(TimePoint:[0-9]{8})_z_(Zpos:[0-9]{4}).tif",
@@ -81,7 +86,7 @@ void GenericLoader::parseFolders(QDir folder, QString pattern, ExperimentFileMod
                         row = (matches[idx].at(0).toLatin1() - 'A');
 
                     idx = matchers.indexOf("WellCol");
-                    col = matches[idx].toInt(&ok);
+                    col = matches[idx].toInt(&ok)-1;
                 }
 
                 int timepoint = 1, zpos = 1;
